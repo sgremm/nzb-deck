@@ -156,6 +156,77 @@ async fn direct_download_removes_par2_and_keeps_content() {
 }
 
 #[tokio::test]
+async fn extensionless_archive_is_detected_by_magic_and_unpacked() {
+    let root = unique_root("endungslos").await;
+    let destination = run_pipeline(&root, "Endungslos", |download_path| {
+        write_zip_archive(
+            &download_path.join("endungsloses-buch"),
+            "leseprobe.txt",
+            b"inhalt aus endungslosem archiv",
+        );
+    })
+    .await;
+
+    let names = list_files(&destination).await;
+    assert_eq!(
+        names,
+        vec!["leseprobe.txt"],
+        "eine Datei ohne Endung wird per Header-Magic erkannt und entpackt"
+    );
+    let content = tokio::fs::read(destination.join("leseprobe.txt"))
+        .await
+        .expect("read extracted file");
+    assert_eq!(content, b"inhalt aus endungslosem archiv");
+
+    let _ = tokio::fs::remove_dir_all(&root).await;
+}
+
+#[tokio::test]
+async fn dotted_post_name_is_detected_by_magic_and_unpacked() {
+    let root = unique_root("punkte-name").await;
+    let destination = run_pipeline(&root, "Dotted", |download_path| {
+        // Nachgestellte Punkte erzeugen eine scheinbare Endung ("Ebooks-Newsstand").
+        write_zip_archive(
+            &download_path.join("Mein.Buch.German.Ebooks-Newsstand"),
+            "leseprobe.txt",
+            b"inhalt trotz punkte-im-namen",
+        );
+    })
+    .await;
+
+    let names = list_files(&destination).await;
+    assert_eq!(
+        names,
+        vec!["leseprobe.txt"],
+        "auch Dateinamen mit Punkten werden per Header-Magic erkannt und entpackt"
+    );
+
+    let _ = tokio::fs::remove_dir_all(&root).await;
+}
+
+#[tokio::test]
+async fn epub_files_are_never_unpacked_as_zip() {
+    let root = unique_root("epub-schutz").await;
+    let destination = run_pipeline(&root, "Buch als epub", |download_path| {
+        write_zip_archive(
+            &download_path.join("buch.epub"),
+            "OEBPS/inhalt.xhtml",
+            b"<html/>",
+        );
+    })
+    .await;
+
+    let names = list_files(&destination).await;
+    assert_eq!(
+        names,
+        vec!["buch.epub"],
+        "eine .epub-Datei (ZIP-Magic) ist Inhalt und darf nicht entpackt werden"
+    );
+
+    let _ = tokio::fs::remove_dir_all(&root).await;
+}
+
+#[tokio::test]
 async fn content_only_par2_results_are_left_untouched() {
     let root = unique_root("par2-only").await;
     let destination = run_pipeline(&root, "Nur Paritaet", |download_path| {

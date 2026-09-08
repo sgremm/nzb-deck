@@ -103,9 +103,9 @@ impl ZipExtractor {
         dest_path: &Path,
         archive_path: &Path,
     ) -> Result<Option<PathBuf>> {
-        // Get the file path
+        // Get the file path (traversal-safe, invalid characters replaced)
         let file_path = match file.enclosed_name() {
-            Some(path) => dest_path.join(path),
+            Some(path) => dest_path.join(super::shared::sanitize_relative_path(&path)),
             None => {
                 warn!("skipping entry with unsafe path");
                 return Ok(None);

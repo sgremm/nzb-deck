@@ -134,16 +134,99 @@ pub(crate) async fn extract_with_passwords_impl(
 /// Detect archive type by file extension
 ///
 /// Returns the archive type based on the file extension.
-/// Supports RAR (.rar, .r00), 7z (.7z), and ZIP (.zip) formats.
-pub fn detect_archive_type(path: &Path) -> Option<ArchiveType> {
-    let ext = path.extension()?.to_str()?.to_lowercase();
+/// Formats that carry archive magic but must never be unpacked as containers
+/// (e-books, office documents, executables, ...).
+const NON_ARCHIVE_EXTENSIONS: &[&str] = &[
+    "epub", "cbz", "doc", "docx", "xls", "xlsx", "pptx", "odt", "ods", "odp", "jar", "apk", "mobi",
+    "azw", "azw3", "prc", "lit", "pdf",
+];
 
-    match ext.as_str() {
-        "rar" | "r00" => Some(ArchiveType::Rar),
-        "7z" => Some(ArchiveType::SevenZip),
-        "zip" => Some(ArchiveType::Zip),
-        _ => None,
+/// Supports RAR (.rar, .r00), 7z (.7z), and ZIP (.zip) formats.
+///
+/// When the extension is missing or unknown (posts frequently strip archive
+/// extensions or use dotted names that look like extensions), the file header
+/// is inspected: RAR5/RAR4 start with "Rar!\x1a\x07", 7z with "7z\xbc\xaf'\x1c",
+/// ZIP with "PK\x03\x04".
+pub fn detect_archive_type(path: &Path) -> Option<ArchiveType> {
+    if let Some(ext) = path.extension().map(|e| e.to_str().unwrap_or_default()) {
+        let ext = ext.to_lowercase();
+        match ext.as_str() {
+            "rar" | "r00" => return Some(ArchiveType::Rar),
+            "7z" => return Some(ArchiveType::SevenZip),
+            "zip" => return Some(ArchiveType::Zip),
+            _ => {}
+        }
+        // Well-known non-archive formats must not be sniffed: e.g. .epub/.docx
+        // start with ZIP magic but are content, not containers to unpack.
+        if NON_ARCHIVE_EXTENSIONS.contains(&ext.as_str()) {
+            return None;
+        }
     }
+
+    detect_archive_type_by_magic(path)
+}
+
+/// Replace characters that are invalid in file names on common platforms:
+/// colon, quotes, angle brackets, pipe, control characters, Unicode
+/// noncharacters and private-use glyphs (macOS refuses to create names
+/// containing U+FFFE and friends). Path separators are preserved; callers
+/// split components first.
+pub(crate) fn sanitize_path_component(component: &str) -> String {
+    component
+        .chars()
+        .map(|character| {
+            let codepoint = character as u32;
+            let invalid = character.is_control()
+                || matches!(character, ':' | '*' | '?' | '"' | '<' | '>' | '|')
+                || (0xe000..=0xf8ff).contains(&codepoint)
+                || (0xfdd0..=0xfdef).contains(&codepoint)
+                || matches!(codepoint, 0xfffe | 0xffff);
+            if invalid { '_' } else { character }
+        })
+        .collect()
+}
+
+/// Rebuild a relative archive path component by component, dropping traversal
+/// parts and replacing platform-invalid characters. Prevents path escapes and
+/// creation failures caused by Windows-style names (e.g. "Teil 1: Ende.epub").
+pub(crate) fn sanitize_relative_path(path: &Path) -> PathBuf {
+    use std::path::Component;
+
+    let mut safe = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Normal(part) => {
+                let cleaned = sanitize_path_component(&part.to_string_lossy());
+                if !cleaned.is_empty() && cleaned != "." {
+                    safe.push(cleaned);
+                }
+            }
+            _ => {}
+        }
+    }
+    safe
+}
+
+fn detect_archive_type_by_magic(path: &Path) -> Option<ArchiveType> {
+    use std::io::Read;
+
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut header = [0u8; 8];
+    let read = file.read(&mut header).ok()?;
+    if read < 4 {
+        return None;
+    }
+
+    if header.starts_with(b"Rar!\x1a\x07") {
+        return Some(ArchiveType::Rar);
+    }
+    if header.starts_with(&[0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c]) {
+        return Some(ArchiveType::SevenZip);
+    }
+    if header.starts_with(b"PK\x03\x04") || header.starts_with(b"PK\x05\x06") {
+        return Some(ArchiveType::Zip);
+    }
+    None
 }
 
 /// Check if a file is an archive based on its extension

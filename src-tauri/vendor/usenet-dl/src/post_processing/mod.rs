@@ -499,7 +499,9 @@ impl PostProcessor {
 
     /// Detect all archives in the download directory
     ///
-    /// Scans for RAR, 7z, and ZIP archives
+    /// Scans for RAR, 7z, and ZIP archives. Files without an extension are
+    /// inspected by their header magic, because posts frequently strip the
+    /// extension from archives (e.g. a RAR posted as "filename").
     fn detect_all_archives(&self, download_path: &Path) -> Result<Vec<PathBuf>> {
         let mut all_archives = Vec::new();
 
@@ -515,6 +517,24 @@ impl PostProcessor {
         // Detect ZIP archives
         let zip_archives = crate::extraction::ZipExtractor::detect_zip_files(download_path)?;
         all_archives.extend(zip_archives);
+
+        // Extension-less or unknown-extension files: sniff the header (RAR/7z/ZIP
+        // magic). Dotted post names like "...Ebooks-Newsstand" must not fool the
+        // extension check, so the shared detector decides per file.
+        let entries = std::fs::read_dir(download_path).map_err(|e| {
+            crate::error::Error::Io(std::io::Error::other(format!(
+                "failed to read directory for archive detection: {e}"
+            )))
+        })?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if crate::extraction::detect_archive_type(&path).is_some()
+                && !all_archives.contains(&path)
+            {
+                info!(?path, "detected archive by header magic");
+                all_archives.push(path);
+            }
+        }
 
         Ok(all_archives)
     }

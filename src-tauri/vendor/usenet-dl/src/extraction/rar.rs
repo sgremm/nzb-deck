@@ -138,10 +138,8 @@ impl RarExtractor {
             let header = at_file.entry();
 
             // Sanitize filename to prevent path traversal attacks (e.g., "../../../etc/passwd")
-            let sanitized = Path::new(&header.filename)
-                .components()
-                .filter(|c| matches!(c, std::path::Component::Normal(_)))
-                .collect::<PathBuf>();
+            // and replace platform-invalid characters (Windows posts often use ":").
+            let sanitized = super::shared::sanitize_relative_path(Path::new(&header.filename));
 
             if sanitized.as_os_str().is_empty() {
                 // Skip entries with no valid path components (e.g., pure ".." entries)
@@ -158,6 +156,16 @@ impl RarExtractor {
 
             // Check if it's a file (not a directory)
             if !header.is_directory() {
+                // Nested entries ("Ordner/datei") need their parent directories.
+                if let Some(parent) = file_path.parent() {
+                    std::fs::create_dir_all(parent).map_err(|e| {
+                        Error::Io(std::io::Error::other(format!(
+                            "failed to create extraction directory {}: {}",
+                            parent.display(),
+                            e
+                        )))
+                    })?;
+                }
                 // Extract the file - transitions back to BeforeHeader state
                 at_header = at_file
                     .extract_to(&file_path)

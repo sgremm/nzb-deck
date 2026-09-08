@@ -174,6 +174,9 @@ impl PostProcessor {
                     .await?;
                 run_cleanup_stage(download_id, &download_path, &self.event_tx, &self.config)
                     .await?;
+                // PAR2 data has done its job (verify/repair succeeded). Only reachable
+                // on success, so the recovery files can be removed from the result.
+                self.remove_par2_from_result(download_id, &final_path).await;
                 Ok(final_path)
             }
         }
@@ -209,7 +212,64 @@ impl PostProcessor {
             .run_move_stage(download_id, &source, &destination)
             .await?;
         run_cleanup_stage(download_id, &download_path, &self.event_tx, &self.config).await?;
+        self.remove_par2_from_result(download_id, &final_path).await;
         Ok(final_path)
+    }
+
+    /// Remove PAR2 recovery files from a successfully processed result folder.
+    ///
+    /// Verification and repair already completed at this point, so the recovery
+    /// files no longer serve a purpose. Files are only removed when the folder
+    /// still contains real content; a download consisting solely of PAR2 data is
+    /// left untouched. Failures are logged, never fatal.
+    async fn remove_par2_from_result(&self, download_id: DownloadId, folder: &Path) {
+        let Ok(mut entries) = tokio::fs::read_dir(folder).await else {
+            return;
+        };
+        let mut par2_files = Vec::new();
+        let mut content_files = 0usize;
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let Ok(file_type) = entry.file_type().await else {
+                continue;
+            };
+            if !file_type.is_file() {
+                continue;
+            }
+            let is_par2 = entry
+                .path()
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("par2"));
+            if is_par2 {
+                par2_files.push(entry.path());
+            } else {
+                content_files += 1;
+            }
+        }
+
+        if par2_files.is_empty() || content_files == 0 {
+            return;
+        }
+
+        let mut removed = 0usize;
+        for path in par2_files {
+            match tokio::fs::remove_file(&path).await {
+                Ok(()) => removed += 1,
+                Err(e) => warn!(
+                    download_id = download_id.0,
+                    ?path,
+                    error = %e,
+                    "failed to remove PAR2 file"
+                ),
+            }
+        }
+        if removed > 0 {
+            info!(
+                download_id = download_id.0,
+                ?folder,
+                removed,
+                "removed {removed} PAR2 file(s) after successful processing"
+            );
+        }
     }
 
     /// Re-run extraction only (skip verify/repair)

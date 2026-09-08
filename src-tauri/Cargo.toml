@@ -26,6 +26,10 @@ tokio = { version = "1", features = ["sync", "fs", "rt-multi-thread"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2"
 
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs", "time"] }
+usenet-dl = { path = "vendor/usenet-dl" }
+
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]
 codegen-units = 1

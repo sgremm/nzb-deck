@@ -99,6 +99,7 @@ version = "0.7"
 
 [dependencies.nntp-rs]
 version = "0.3.0"
+path = "../nntp-rs"
 
 [dependencies.notify]
 version = "6"

@@ -334,11 +334,22 @@ pub(super) fn decode_and_write(
 
             Ok(decoded_size)
         }
-        Err(_) => {
+        Err(decode_error) => {
             // Legacy downloads without file metadata keep raw data as fallback.
             // Downloads with a known file mapping must decode as yEnc; writing the
             // encoded garbage as "success" silently completes jobs with corrupt files.
             if output_files.files.contains_key(&article.file_index) {
+                let head_len = payload.len().min(96);
+                tracing::error!(
+                    article = %article.message_id,
+                    file_index = article.file_index,
+                    payload_bytes = payload.len(),
+                    ybegin = payload.windows(8).position(|w| w == b"=ybegin"),
+                    yend = payload.windows(6).position(|w| w == b"=yend"),
+                    head = %String::from_utf8_lossy(&payload[..head_len]),
+                    decode_error = %decode_error,
+                    "yEnc decode failed for article"
+                );
                 return Err(format!(
                     "yEnc decode failed for article {} (file index {})",
                     article.message_id, article.file_index

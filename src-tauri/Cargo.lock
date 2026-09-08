@@ -3052,8 +3052,6 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 [[package]]
 name = "nntp-rs"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46f011cb36a7f867b112eff1f3057745a410026d96031b7826a0e89377ae129e"
 dependencies = [
  "base64 0.22.1",
  "bb8",

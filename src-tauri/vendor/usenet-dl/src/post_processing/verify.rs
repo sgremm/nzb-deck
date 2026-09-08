@@ -270,7 +270,9 @@ fn is_par2_magic(path: &Path) -> std::io::Result<bool> {
     let mut file = std::fs::File::open(path)?;
     let mut header = [0u8; 16];
     let read = file.read(&mut header)?;
-    Ok(read == 16 && &header[8..16] == PAR2_MAGIC)
+    // QuickPar-style files carry 8 zero bytes before the magic; the RFC layout
+    // starts with "PAR2\0PKT" at offset 0. Accept both.
+    Ok(read == 16 && (&header[0..8] == PAR2_MAGIC || &header[8..16] == PAR2_MAGIC))
 }
 
 fn find_matching_file(

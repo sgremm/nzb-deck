@@ -9,8 +9,30 @@ use commands::{
 };
 use state::AppState;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, OnceLock};
 use tauri::{Manager, RunEvent};
+
+/// NZB-Pfade, die über "Oeffnen mit"/Doppelklick eintreffen, bevor der
+/// App-Zustand in `setup` verwaltet wird. Werden nach dem Setup importiert.
+static PENDING_OPEN_PATHS: OnceLock<Mutex<Vec<PathBuf>>> = OnceLock::new();
+
+fn pending_open_paths() -> &'static Mutex<Vec<PathBuf>> {
+    PENDING_OPEN_PATHS.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+fn remember_open_paths(paths: Vec<PathBuf>) {
+    if let Ok(mut pending) = pending_open_paths().lock() {
+        pending.extend(paths);
+    }
+}
+
+fn drain_open_paths() -> Vec<PathBuf> {
+    if let Ok(mut pending) = pending_open_paths().lock() {
+        std::mem::take(&mut pending)
+    } else {
+        Vec::new()
+    }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -50,6 +72,12 @@ pub fn run() {
                 .map_err(|error| Box::<dyn std::error::Error>::from(error))?;
             app.manage(state.clone());
 
+            // Fruehe "Oeffnen mit"-Ereignisse (vor manage) jetzt importieren.
+            let pending = drain_open_paths();
+            if !pending.is_empty() {
+                import_in_background(app.handle().clone(), state.clone(), pending);
+            }
+
             let startup_paths = paths_from_strings(std::env::args().skip(1));
             if !startup_paths.is_empty() {
                 import_in_background(app.handle().clone(), state, startup_paths);
@@ -84,6 +112,8 @@ pub fn run() {
                 && let Some(state) = app_handle.try_state::<Arc<AppState>>()
             {
                 import_in_background(app_handle.clone(), state.inner().clone(), paths);
+            } else if !paths.is_empty() {
+                remember_open_paths(paths);
             }
         }
         RunEvent::Exit => {

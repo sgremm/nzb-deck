@@ -34,6 +34,7 @@ tao = { path = "vendor/tao" }
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs", "time"] }
 usenet-dl = { path = "vendor/usenet-dl" }
+zip = "0.6"
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

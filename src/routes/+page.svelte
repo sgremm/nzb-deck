@@ -19,6 +19,7 @@
     configured: boolean;
     connected: boolean;
     error: string | null;
+    version: string;
   };
 
   type JobView = {
@@ -69,7 +70,7 @@
 
   let jobs = $state<JobView[]>([]);
   let settings = $state<AppSettings>({ ...defaultSettings });
-  let backend = $state<BackendStatus>({ configured: false, connected: false, error: null });
+  let backend = $state<BackendStatus>({ configured: false, connected: false, error: null, version: "" });
   let loading = $state(true);
   let loadError = $state("");
   let globalError = $state("");
@@ -183,7 +184,7 @@
     try {
       backend = await invoke<BackendStatus>("backend_status");
     } catch (error) {
-      backend = { configured: false, connected: false, error: errorText(error) };
+      backend = { configured: false, connected: false, error: errorText(error), version: "" };
     }
   }
 
@@ -496,6 +497,10 @@
       </section>
     {/if}
   </main>
+
+  <footer class="version-bar" aria-label="App-Version">
+    <span>NZB Deck v{backend.version || "–"}</span>
+  </footer>
 </div>
 
 {#if sheetOpen}
@@ -738,5 +743,22 @@
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  }
+
+  .version-bar {
+    position: fixed;
+    bottom: calc(var(--space-2) + env(safe-area-inset-bottom));
+    left: max(var(--space-3), env(safe-area-inset-left));
+    z-index: 5;
+    padding: 0.1rem 0.5rem;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    background: color-mix(in srgb, var(--surface-raised), transparent 18%);
+    font-size: 0.72rem;
+    line-height: 1.4;
+    letter-spacing: 0.02em;
+    opacity: 0.85;
+    pointer-events: none;
+    user-select: none;
   }
 </style>

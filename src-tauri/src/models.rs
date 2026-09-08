@@ -42,4 +42,5 @@ pub struct BackendStatus {
     pub configured: bool,
     pub connected: bool,
     pub error: Option<String>,
+    pub version: String,
 }

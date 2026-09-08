@@ -259,6 +259,7 @@ impl AppState {
             configured: settings.is_configured(),
             connected: settings.is_configured() && error.is_none(),
             error,
+            version: env!("CARGO_PKG_VERSION").to_string(),
         }
     }
 }

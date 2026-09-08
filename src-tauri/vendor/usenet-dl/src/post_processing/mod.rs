@@ -169,18 +169,14 @@ impl PostProcessor {
                     .await?;
                 }
                 let extracted_path = self.run_extract_stage(download_id, &download_path).await?;
-                // PAR2 data has done its job only when an archive was actually
-                // unpacked. Direct downloads (ebooks, pdfs, ...) keep their
-                // recovery files next to the content.
-                let unpacked = extracted_path != download_path;
                 let final_path = self
                     .run_move_stage(download_id, &extracted_path, &destination)
                     .await?;
                 run_cleanup_stage(download_id, &download_path, &self.event_tx, &self.config)
                     .await?;
-                if unpacked {
-                    self.remove_par2_from_result(download_id, &final_path).await;
-                }
+                // PAR2 data has done its job (verify/repair succeeded). Only reachable
+                // on success, so the recovery files are removed from the result.
+                self.remove_par2_from_result(download_id, &final_path).await;
                 Ok(final_path)
             }
         }

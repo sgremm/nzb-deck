@@ -134,7 +134,7 @@ async fn unpacked_archive_removes_par2_but_keeps_extracted_content() {
 }
 
 #[tokio::test]
-async fn direct_download_keeps_par2_next_to_content() {
+async fn direct_download_removes_par2_and_keeps_content() {
     let root = unique_root("par2-direkt").await;
     let destination = run_pipeline(&root, "Direktes E-Book", |download_path| {
         std::fs::write(download_path.join("buch.azw3"), b"ebook-inhalt")
@@ -148,8 +148,8 @@ async fn direct_download_keeps_par2_next_to_content() {
     let names = list_files(&destination).await;
     assert_eq!(
         names,
-        vec!["buch.azw3", "buch.par2", "buch.vol00+01.par2"],
-        "ohne Archiv (nichts ausgepackt) bleiben die PAR2-Dateien erhalten"
+        vec!["buch.azw3"],
+        "nach erfolgreichem Download werden PAR2-Dateien entfernt, Inhalt bleibt"
     );
 
     let _ = tokio::fs::remove_dir_all(&root).await;

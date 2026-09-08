@@ -15,9 +15,10 @@ use tauri::{Manager, RunEvent};
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let _ = tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(
-            |_| tracing_subscriber::EnvFilter::new("warn"),
-        ))
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn")),
+        )
         .with_writer(std::io::stderr)
         .try_init();
 
@@ -30,9 +31,10 @@ pub fn run() {
             let _ = window.set_focus();
         }
         let paths = paths_from_strings(args.into_iter().skip(1));
-        if !paths.is_empty() {
-            let state = app.state::<Arc<AppState>>().inner().clone();
-            import_in_background(app.clone(), state, paths);
+        if !paths.is_empty()
+            && let Some(state) = app.try_state::<Arc<AppState>>()
+        {
+            import_in_background(app.clone(), state.inner().clone(), paths);
         }
     }));
 
@@ -78,9 +80,10 @@ pub fn run() {
                 .filter_map(|url| url.to_file_path().ok())
                 .filter(|path| is_nzb(path))
                 .collect::<Vec<_>>();
-            if !paths.is_empty() {
-                let state = app_handle.state::<Arc<AppState>>().inner().clone();
-                import_in_background(app_handle.clone(), state, paths);
+            if !paths.is_empty()
+                && let Some(state) = app_handle.try_state::<Arc<AppState>>()
+            {
+                import_in_background(app_handle.clone(), state.inner().clone(), paths);
             }
         }
         RunEvent::Exit => {

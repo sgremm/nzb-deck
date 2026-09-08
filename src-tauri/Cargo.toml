@@ -26,6 +26,11 @@ tokio = { version = "1", features = ["sync", "fs", "rt-multi-thread"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2"
 
+[patch.crates-io]
+# tao 0.35.3 panickt bei LaunchServices-Dateiöffnung (unwrap auf absoluteString);
+# lokaler Patch in vendor/tao behebt das.
+tao = { path = "vendor/tao" }
+
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs", "time"] }
 usenet-dl = { path = "vendor/usenet-dl" }

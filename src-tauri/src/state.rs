@@ -139,7 +139,7 @@ impl AppState {
                 password: nonempty(&settings.password),
                 connections: settings.connections.clamp(1, 50),
                 priority: 0,
-                pipeline_depth: 10,
+                pipeline_depth: 1,
             }]
         } else {
             Vec::new()

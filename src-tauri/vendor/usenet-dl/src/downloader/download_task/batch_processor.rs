@@ -209,9 +209,27 @@ pub(super) async fn fetch_article_batch(
     let decode_results = tokio::task::spawn_blocking(move || {
         let mut results: Vec<DecodeResult> = Vec::with_capacity(article_batch.len());
         for (article, response) in article_batch.iter().zip(responses.iter()) {
+            // A successful NNTP response must carry a body. Providers signal missing
+            // articles with error codes, but a few return an empty success body; treat
+            // that as a failed article instead of completing the job with empty files.
+            if response.data.is_empty() {
+                results.push(Err((
+                    article.id,
+                    format!(
+                        "article {} returned an empty body (missing or expired on the server?)",
+                        article.message_id
+                    ),
+                )));
+                continue;
+            }
             match decode_and_write(article, &response.data, &output_files_bg, &temp_dir_bg) {
                 Ok(decoded_size) => {
-                    results.push(Ok((article.id, article.file_index, article.segment_number, decoded_size)));
+                    results.push(Ok((
+                        article.id,
+                        article.file_index,
+                        article.segment_number,
+                        decoded_size,
+                    )));
                 }
                 Err(e) => {
                     results.push(Err((article.id, e)));
@@ -269,7 +287,9 @@ pub(super) fn decode_and_write(
         Ok(decoded) => {
             let decoded_size = decoded.data.len() as u64;
 
-            if let Some((file_handle, _filename, allocated)) = output_files.files.get(&article.file_index) {
+            if let Some((file_handle, _filename, allocated)) =
+                output_files.files.get(&article.file_index)
+            {
                 // Calculate byte offset (yEnc begin is 1-based)
                 let offset = decoded
                     .part
@@ -301,7 +321,15 @@ pub(super) fn decode_and_write(
             Ok(decoded_size)
         }
         Err(_) => {
-            // yEnc decode failed -- write raw data as fallback
+            // Legacy downloads without file metadata keep raw data as fallback.
+            // Downloads with a known file mapping must decode as yEnc; writing the
+            // encoded garbage as "success" silently completes jobs with corrupt files.
+            if output_files.files.contains_key(&article.file_index) {
+                return Err(format!(
+                    "yEnc decode failed for article {} (file index {})",
+                    article.message_id, article.file_index
+                ));
+            }
             let article_file =
                 download_temp_dir.join(format!("article_{}.dat", article.segment_number));
             let raw_size = data.len() as u64;

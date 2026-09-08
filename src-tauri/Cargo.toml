@@ -23,6 +23,7 @@ tauri-plugin-opener = "2"
 tauri-plugin-single-instance = "2"
 usenet-dl = { path = "vendor/usenet-dl" }
 tokio = { version = "1", features = ["sync", "fs", "rt-multi-thread"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2"
 
 

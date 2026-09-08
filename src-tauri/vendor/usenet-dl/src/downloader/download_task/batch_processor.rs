@@ -282,9 +282,23 @@ pub(super) fn decode_and_write(
     output_files: &OutputFiles,
     download_temp_dir: &std::path::Path,
 ) -> std::result::Result<u64, String> {
-    // Try yEnc decode
-    match nntp_rs::yenc_decode(data) {
+    // NNTP servers answer ARTICLE with the article headers before the yEnc body.
+    // The decoder requires "=ybegin" as its first line, so strip any leading
+    // header block (harmless no-op when the body already starts with "=ybegin").
+    let payload = strip_leading_lines_before(data, b"=ybegin");
+    match nntp_rs::yenc_decode(payload) {
         Ok(decoded) => {
+            // Providers sometimes answer known-but-withheld articles with an empty
+            // yEnc body; an empty article must never complete a file with zero bytes.
+            if decoded.data.is_empty()
+                && decoded.header.size > 0
+                && output_files.files.contains_key(&article.file_index)
+            {
+                return Err(format!(
+                    "article {} returned an empty yEnc body (file index {})",
+                    article.message_id, article.file_index
+                ));
+            }
             let decoded_size = decoded.data.len() as u64;
 
             if let Some((file_handle, _filename, allocated)) =
@@ -337,6 +351,23 @@ pub(super) fn decode_and_write(
                 .map_err(|e| format!("Failed to write raw article file: {}", e))?;
             Ok(raw_size)
         }
+    }
+}
+
+/// Return the suffix of `data` starting at the first line with the given prefix.
+///
+/// Returns the input unchanged when the marker is absent or already at the start.
+fn strip_leading_lines_before<'a>(data: &'a [u8], marker: &[u8]) -> &'a [u8] {
+    let mut line_start = 0usize;
+    loop {
+        let line = &data[line_start..];
+        if line.starts_with(marker) || line.is_empty() {
+            return &data[line_start..];
+        }
+        let Some(relative_newline) = line.iter().position(|&byte| byte == b'\n') else {
+            return data;
+        };
+        line_start += relative_newline + 1;
     }
 }
 

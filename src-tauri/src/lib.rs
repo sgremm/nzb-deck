@@ -4,8 +4,8 @@ mod parity;
 mod state;
 
 use commands::{
-    backend_status, get_settings, import_nzbs, list_jobs, pause_job, reprocess_job, rerun_job,
-    resume_job, save_settings, test_server,
+    backend_status, clear_jobs, delete_job, get_settings, import_nzbs, list_jobs, pause_job,
+    reprocess_job, rerun_job, resume_job, save_settings, test_server,
 };
 use state::AppState;
 use std::path::PathBuf;
@@ -94,6 +94,8 @@ pub fn run() {
             resume_job,
             rerun_job,
             reprocess_job,
+            delete_job,
+            clear_jobs,
             test_server
         ]);
 

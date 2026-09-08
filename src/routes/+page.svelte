@@ -81,6 +81,12 @@
   let testMessage = $state("");
   let settingsError = $state("");
   let busyJobs = $state<Set<number>>(new Set());
+  let deleting = $state(false);
+  let clearArmed = $state(false);
+  let clearArmTimer: ReturnType<typeof setTimeout> | undefined;
+  let removableCount = $derived(
+    jobs.filter((job) => job.status === "complete" || job.status === "failed").length,
+  );
   let reloadTimer: ReturnType<typeof setTimeout> | undefined;
   let settingsSheet = $state<HTMLElement | undefined>();
   let loadSequence = 0;
@@ -249,6 +255,48 @@
     }
   }
 
+  async function deleteJob(id: number): Promise<void> {
+    globalError = "";
+    busyJobs = new Set(busyJobs).add(id);
+    try {
+      await invoke("delete_job", { id });
+      jobs = jobs.filter((job) => job.id !== id);
+    } catch (error) {
+      globalError = `Löschen fehlgeschlagen: ${errorText(error)}`;
+    } finally {
+      const next = new Set(busyJobs);
+      next.delete(id);
+      busyJobs = next;
+    }
+  }
+
+  function armClearAll(): void {
+    if (clearArmed) {
+      void clearAllJobs();
+      return;
+    }
+    clearArmed = true;
+    if (clearArmTimer) clearTimeout(clearArmTimer);
+    clearArmTimer = setTimeout(() => { clearArmed = false; }, 4000);
+  }
+
+  async function clearAllJobs(): Promise<void> {
+    clearArmed = false;
+    if (clearArmTimer) clearTimeout(clearArmTimer);
+    globalError = "";
+    deleting = true;
+    try {
+      const removed = await invoke<number>("clear_jobs");
+      if (removed > 0) {
+        jobs = jobs.filter((job) => job.status !== "complete" && job.status !== "failed");
+      }
+    } catch (error) {
+      globalError = `Alle löschen fehlgeschlagen: ${errorText(error)}`;
+    } finally {
+      deleting = false;
+    }
+  }
+
   function handleKeydown(event: KeyboardEvent): void {
     if (sheetOpen && event.key === "Escape" && !settingsBusy) sheetOpen = false;
   }
@@ -350,6 +398,11 @@
       <button class="button primary" type="button" onclick={addNzbs} disabled={adding}>
         <span aria-hidden="true">＋</span>{adding ? "Wird geöffnet …" : "NZB hinzufügen"}
       </button>
+      {#if removableCount > 0}
+        <button class="button quiet danger" type="button" onclick={armClearAll} disabled={deleting}>
+          {clearArmed ? "Wirklich alle löschen?" : `Alle löschen (${removableCount})`}
+        </button>
+      {/if}
       <button class="button icon-button" type="button" onclick={showSettings} disabled={settingsLoading} aria-label="Einstellungen öffnen" title="Einstellungen">
         <span aria-hidden="true">⚙︎</span>
       </button>
@@ -430,9 +483,11 @@
                 {:else if job.status === "failed"}
                   <button class="button primary small" type="button" disabled={busyJobs.has(job.id)} onclick={() => runJobAction(job.id, "rerun_job")}>↻&nbsp; Neu herunterladen</button>
                   <button class="button secondary" type="button" disabled={busyJobs.has(job.id)} onclick={() => runJobAction(job.id, "reprocess_job")}>Erneut verarbeiten</button>
+                  <button class="button quiet danger" type="button" disabled={busyJobs.has(job.id)} onclick={() => deleteJob(job.id)}>Löschen</button>
                 {:else if job.status === "complete"}
                   <button class="button primary small" type="button" disabled={busyJobs.has(job.id)} onclick={() => runJobAction(job.id, "rerun_job")}>↻&nbsp; Neu herunterladen</button>
                   <button class="button secondary" type="button" disabled={busyJobs.has(job.id)} onclick={() => runJobAction(job.id, "reprocess_job")}>Erneut verarbeiten</button>
+                  <button class="button quiet danger" type="button" disabled={busyJobs.has(job.id)} onclick={() => deleteJob(job.id)}>Löschen</button>
                 {/if}
               </div>
             </footer>
@@ -553,6 +608,8 @@
   .button.secondary:hover:not(:disabled) { border-color: var(--line-strong); background: var(--surface-muted); }
   .button.quiet { color: var(--text-muted); background: transparent; }
   .button.quiet:hover:not(:disabled) { color: var(--text); background: var(--surface-muted); }
+  .button.quiet.danger { color: var(--danger); }
+  .button.quiet.danger:hover:not(:disabled) { color: var(--danger); background: var(--danger-soft); }
   .icon-button { width: var(--control); padding: 0; color: var(--text); border-color: var(--line); background: var(--surface); font-size: 1.1rem; }
   .icon-button:hover { background: var(--surface-muted); }
 

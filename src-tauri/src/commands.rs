@@ -199,6 +199,62 @@ fn is_nzb(path: &Path) -> bool {
         .is_some_and(|extension| extension.eq_ignore_ascii_case("nzb"))
 }
 
+/// Status, unter dem ein Auftrag entfernt werden darf (kein aktiver Lauf).
+fn is_removable(status: Status) -> bool {
+    matches!(status, Status::Complete | Status::Failed)
+}
+
+/// Entfernt den konservierten NZB-Export eines Auftrags (Wiederverwenden
+/// wäre sonst später nicht mehr möglich – wird nur beim Löschen gemacht).
+async fn remove_preserved_nzb(state: &AppState, id: i64) {
+    let _ = tokio::fs::remove_file(state.paths.nzb_dir.join(format!("{id}.nzb"))).await;
+}
+
+#[tauri::command]
+pub async fn delete_job(state: State<'_, Arc<AppState>>, id: i64) -> Result<(), String> {
+    let download = state
+        .database
+        .get_download(DownloadId(id))
+        .await
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("Download {id} wurde nicht gefunden"))?;
+    if !is_removable(Status::from_i32(download.status)) {
+        return Err(
+            "Nur abgeschlossene oder fehlgeschlagene Downloads können gelöscht werden".into(),
+        );
+    }
+    state
+        .database
+        .delete_download(DownloadId(id))
+        .await
+        .map_err(|error| error.to_string())?;
+    remove_preserved_nzb(&state, id).await;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn clear_jobs(state: State<'_, Arc<AppState>>) -> Result<usize, String> {
+    let downloads = state
+        .database
+        .list_downloads()
+        .await
+        .map_err(|error| error.to_string())?;
+    let mut removed = 0;
+    for download in downloads {
+        if !is_removable(Status::from_i32(download.status)) {
+            continue;
+        }
+        state
+            .database
+            .delete_download(DownloadId(download.id))
+            .await
+            .map_err(|error| error.to_string())?;
+        remove_preserved_nzb(&state, download.id).await;
+        removed += 1;
+    }
+    Ok(removed)
+}
+
 fn option(value: &str) -> Option<String> {
     let value = value.trim();
     (!value.is_empty()).then(|| value.to_string())

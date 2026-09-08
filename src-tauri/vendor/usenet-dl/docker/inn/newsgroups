@@ -1,0 +1,6 @@
+# Newsgroups for usenet-dl testing
+# Format: groupname high low flags
+alt.test 0000000000 0000000001 y
+alt.binaries.test 0000000000 0000000001 y
+usenet-dl.test 0000000000 0000000001 y
+usenet-dl.test.binary 0000000000 0000000001 y

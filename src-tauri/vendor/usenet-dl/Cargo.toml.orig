@@ -1,0 +1,122 @@
+[package]
+name = "usenet-dl"
+version = "0.4.0"
+edition = "2024"
+authors = ["usenet-dl contributors"]
+license = "MIT OR Apache-2.0"
+description = "Highly configurable Usenet download manager library"
+repository = "https://github.com/jvz-devx/usenet-dl"
+keywords = ["usenet", "nntp", "nzb", "download", "newsgroup"]
+categories = ["network-programming", "web-programming"]
+rust-version = "1.93"
+readme = "README.md"
+homepage = "https://crates.io/crates/usenet-dl"
+documentation = "https://docs.rs/usenet-dl"
+exclude = [
+    ".github/",
+    "docs/",
+    "tests/",
+    "benchmarks/",
+    "downloads/",
+    ".env*",
+    "*.nzb",
+]
+
+[dependencies]
+# Core NNTP functionality
+nntp-rs = "0.3.0"
+
+# Async runtime
+tokio = { version = "1", features = ["full", "signal"] }
+tokio-util = "0.7"
+futures = "0.3"
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
+
+# Archive extraction
+unrar = "0.5"
+sevenz-rust = { version = "0.5", features = ["aes256"] }
+zip = "0.6"
+
+# Binary discovery and async traits
+which = "6"
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Logging and errors
+tracing = "0.1"
+thiserror = "1"
+
+# HTTP client (webhooks, URL fetching, RSS)
+reqwest = { version = "0.11", features = ["json"] }
+url = "2"
+urlencoding = "2"
+
+# File watching
+notify = "6"
+
+# Date/time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# Hashing (duplicate detection, PAR2 metadata)
+sha2 = "0.10"
+md5 = "0.7"
+
+# Regular expressions (RSS filters)
+regex = "1"
+
+# Random number generation (retry jitter)
+rand = "0.8"
+
+# REST API
+axum = { version = "0.7", features = ["multipart"] }
+tower = { version = "0.4", features = ["util"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# OpenAPI documentation
+utoipa = { version = "4", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "6", features = ["axum"] }
+
+# Server-Sent Events
+tokio-stream = { version = "0.1", features = ["sync"] }
+
+# RSS feed support
+rss = "2"
+atom_syndication = "0.12"  # Using 0.12 for better quick-xml compatibility
+
+[features]
+default = []
+live-tests = []                                      # Real NNTP provider tests
+docker-tests = []                                    # Docker-based tests
+
+[dev-dependencies]
+# Testing utilities
+tempfile = "3"
+tokio-test = "0.4"
+wiremock = "0.6"
+walkdir = "2"
+
+# E2E testing
+dotenvy = "0.15"                                     # Load .env files
+serial_test = "3"                                    # Sequential test execution
+
+[[example]]
+name = "speedtest"
+path = "examples/speedtest.rs"
+
+# Platform-specific dependencies for disk space checking
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["fileapi"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

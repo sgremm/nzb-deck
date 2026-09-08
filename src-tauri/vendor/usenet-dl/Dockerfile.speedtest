@@ -1,0 +1,16 @@
+FROM rust:latest AS builder
+WORKDIR /build
+
+# Copy nntp-rs first (sibling dependency)
+COPY nntp-rs /build/nntp-rs
+
+# Copy usenet-dl
+COPY usenet-dl /build/usenet-dl
+
+WORKDIR /build/usenet-dl
+RUN cargo build --release --example speedtest
+
+FROM debian:trixie-slim
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /build/usenet-dl/target/release/examples/speedtest /usr/local/bin/speedtest
+ENTRYPOINT ["speedtest"]

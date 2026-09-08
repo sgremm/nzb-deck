@@ -1,0 +1,16 @@
+#!/bin/bash
+# Test script that succeeds and writes environment variables to a file
+
+# Write all USENET_DL_* environment variables to a file
+OUTPUT_FILE="/tmp/usenet_script_output_${USENET_DL_ID}.txt"
+echo "USENET_DL_ID=${USENET_DL_ID}" > "$OUTPUT_FILE"
+echo "USENET_DL_NAME=${USENET_DL_NAME}" >> "$OUTPUT_FILE"
+echo "USENET_DL_CATEGORY=${USENET_DL_CATEGORY}" >> "$OUTPUT_FILE"
+echo "USENET_DL_STATUS=${USENET_DL_STATUS}" >> "$OUTPUT_FILE"
+echo "USENET_DL_DESTINATION=${USENET_DL_DESTINATION}" >> "$OUTPUT_FILE"
+echo "USENET_DL_ERROR=${USENET_DL_ERROR}" >> "$OUTPUT_FILE"
+echo "USENET_DL_SIZE=${USENET_DL_SIZE}" >> "$OUTPUT_FILE"
+echo "USENET_DL_IS_CATEGORY_SCRIPT=${USENET_DL_IS_CATEGORY_SCRIPT}" >> "$OUTPUT_FILE"
+echo "USENET_DL_CATEGORY_DESTINATION=${USENET_DL_CATEGORY_DESTINATION}" >> "$OUTPUT_FILE"
+
+exit 0

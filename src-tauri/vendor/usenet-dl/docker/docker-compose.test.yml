@@ -1,0 +1,35 @@
+# Docker Compose configuration for local NNTP server testing
+#
+# Usage:
+#   docker-compose -f docker/docker-compose.test.yml up -d
+#   cargo test --features docker-tests --test e2e_docker
+#   docker-compose -f docker/docker-compose.test.yml down
+#
+# The INN server will be available at localhost:10119 (plain NNTP)
+
+version: '3.8'
+
+services:
+  inn-nntp:
+    build:
+      context: ./inn
+      dockerfile: Dockerfile
+    container_name: usenet-dl-test-nntp
+    ports:
+      - "10119:119"     # Plain NNTP
+    volumes:
+      - inn-spool:/var/spool/news
+    environment:
+      - INN_DOMAIN=test.local
+      - INN_ADMIN_EMAIL=admin@test.local
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "119"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  inn-spool:
+    driver: local

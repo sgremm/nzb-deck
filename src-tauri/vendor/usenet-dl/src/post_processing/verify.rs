@@ -9,6 +9,9 @@ use tracing::{debug, info, warn};
 
 use super::PostProcessError;
 
+/// PAR2 packet magic ("PAR2\0PKT") found at offset 8 of every PAR2 file.
+const PAR2_MAGIC: &[u8; 8] = b"PAR2\0PKT";
+
 /// Execute the verify stage
 ///
 /// Returns `Ok(true)` if files are damaged but repairable, `Ok(false)` if
@@ -24,6 +27,11 @@ pub(crate) async fn run_verify_stage(
         ?download_path,
         "running verify stage"
     );
+
+    // Restore real filenames from PAR2 metadata before verification. Usenet posts
+    // frequently obfuscate filenames; without the real names no archive can be
+    // detected and verification cannot match files against the recovery set.
+    deobfuscate_from_par2(download_path).await?;
 
     // Emit Verifying event
     event_tx.send(Event::Verifying { id: download_id }).ok();
@@ -156,4 +164,148 @@ async fn find_par2_files(download_path: &Path) -> Result<Vec<PathBuf>> {
     });
 
     Ok(par2_files)
+}
+
+/// Restore real filenames using PAR2 metadata and normalize PAR2 extensions.
+///
+/// Scans every file in `download_path` for the PAR2 packet magic (independent of
+/// filename), parses the most complete recovery set, and renames matching source
+/// files from their obfuscated names to the names recorded in the set. Files that
+/// carry PAR2 data but no `.par2` extension are given one so verification and
+/// repair can find every recovery volume.
+async fn deobfuscate_from_par2(download_path: &Path) -> Result<()> {
+    let mut entries = match tokio::fs::read_dir(download_path).await {
+        Ok(entries) => entries,
+        Err(e) => {
+            return Err(crate::error::Error::Io(std::io::Error::other(format!(
+                "failed to read directory for deobfuscation: {e}"
+            ))));
+        }
+    };
+
+    let mut ordinary_files = Vec::new();
+    let mut par2_candidates = Vec::new();
+    while let Some(entry) = entries.next_entry().await? {
+        let path = entry.path();
+        let metadata = entry.metadata().await?;
+        if !metadata.is_file() {
+            continue;
+        }
+        match is_par2_magic(&path) {
+            Ok(true) => par2_candidates.push(path),
+            Ok(false) => ordinary_files.push(path),
+            Err(e) => warn!(?path, error = %e, "could not inspect file for PAR2 magic"),
+        }
+    }
+
+    if par2_candidates.is_empty() {
+        return Ok(());
+    }
+    info!(
+        par2_candidates = par2_candidates.len(),
+        "PAR2 data found, restoring filenames from recovery set"
+    );
+
+    // Parse every PAR2 file; the index carries the fullest file description.
+    let mut parsed = Vec::new();
+    for path in &par2_candidates {
+        match rust_par2::parse(path) {
+            Ok(file_set) => parsed.push((path.clone(), file_set)),
+            Err(e) => warn!(?path, error = %e, "failed to parse PAR2 file"),
+        }
+    }
+    let Some((index_path, index_set)) = parsed.iter().max_by_key(|(_, set)| set.files.len()) else {
+        return Ok(());
+    };
+
+    // Match source files by size; disambiguate equal sizes with the 16 KiB hash.
+    let mut unmatched: Vec<PathBuf> = ordinary_files
+        .into_iter()
+        .filter(|path| path != index_path)
+        .collect();
+
+    let mut sources: Vec<&rust_par2::types::Par2File> = index_set.files.values().collect();
+    sources.sort_by_key(|file| std::cmp::Reverse(file.size));
+
+    let mut restored = 0usize;
+    for source in sources {
+        let Some(candidate) = find_matching_file(&source, &unmatched) else {
+            continue;
+        };
+        let target = safe_target_name(download_path, &source.filename);
+        if target == candidate {
+            continue;
+        }
+        if std::fs::rename(&candidate, &target).is_ok() {
+            restored += 1;
+            info!(from = %candidate.display(), to = %target.display(), "restored filename from PAR2 metadata");
+            unmatched.retain(|path| path != &candidate);
+        }
+    }
+
+    // Make sure every PAR2 file is discoverable by extension-based scans.
+    for path in par2_candidates {
+        let has_par2_extension = path
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("par2"));
+        if !has_par2_extension {
+            let target = path.with_extension("par2");
+            if std::fs::rename(&path, &target).is_ok() {
+                info!(from = %path.display(), to = %target.display(), "normalized PAR2 extension");
+            }
+        }
+    }
+
+    if restored > 0 {
+        info!(
+            restored,
+            "restored {restored} filename(s) from PAR2 metadata"
+        );
+    }
+    Ok(())
+}
+
+fn is_par2_magic(path: &Path) -> std::io::Result<bool> {
+    use std::io::Read;
+    let mut file = std::fs::File::open(path)?;
+    let mut header = [0u8; 16];
+    let read = file.read(&mut header)?;
+    Ok(read == 16 && &header[8..16] == PAR2_MAGIC)
+}
+
+fn find_matching_file(
+    source: &rust_par2::types::Par2File,
+    candidates: &[PathBuf],
+) -> Option<PathBuf> {
+    let by_size = candidates
+        .iter()
+        .filter(|path| {
+            std::fs::metadata(path)
+                .map(|metadata| metadata.len() == source.size)
+                .unwrap_or(false)
+        })
+        .collect::<Vec<_>>();
+    if by_size.is_empty() {
+        return None;
+    }
+    if by_size.len() == 1 {
+        return Some(by_size[0].clone());
+    }
+    by_size
+        .into_iter()
+        .find(|path| {
+            rust_par2::compute_hash_16k(path)
+                .map(|hash| hash == source.hash_16k)
+                .unwrap_or(false)
+        })
+        .cloned()
+}
+
+fn safe_target_name(directory: &Path, metadata_name: &str) -> PathBuf {
+    let file_name = Path::new(metadata_name)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .unwrap_or("restored.dat");
+    directory.join(file_name)
 }

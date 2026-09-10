@@ -153,11 +153,11 @@ impl AppState {
         settings: AppSettings,
     ) -> Result<(), String> {
         if settings.download_dir.trim().is_empty() {
-            return Err("A download directory is required".to_string());
+            return Err("Ein Download-Ordner ist erforderlich".to_string());
         }
         tokio::fs::create_dir_all(&settings.download_dir)
             .await
-            .map_err(|error| format!("Could not create download directory: {error}"))?;
+            .map_err(|error| format!("Download-Ordner konnte nicht angelegt werden: {error}"))?;
         let bytes = serde_json::to_vec_pretty(&settings).map_err(|error| error.to_string())?;
         tokio::fs::write(&self.paths.settings_file, bytes)
             .await
@@ -221,12 +221,12 @@ impl AppState {
             let candidate = root.join(folder_name);
             let exists = tokio::fs::try_exists(&candidate)
                 .await
-                .map_err(|error| format!("Could not inspect destination: {error}"))?;
+                .map_err(|error| format!("Zielordner konnte nicht geprüft werden: {error}"))?;
             if !exists && !occupied.contains(&candidate) {
                 return Ok(candidate);
             }
         }
-        unreachable!("the numeric destination suffix is unbounded")
+        unreachable!("der numerische Zielordner-Suffix ist unbeschränkt")
     }
 
     async fn migrate_legacy_destinations(&self) -> Result<(), String> {
@@ -323,7 +323,7 @@ fn safe_job_folder(name: &str) -> String {
         .collect::<String>();
     let sanitized = sanitized.trim_matches(|character| character == ' ' || character == '.');
     if sanitized.is_empty() {
-        "Usenet download".to_string()
+        "Usenet-Download".to_string()
     } else {
         sanitized.to_string()
     }
@@ -339,6 +339,6 @@ mod tests {
             safe_job_folder("  release:part/one.nzb. "),
             "release_part_one.nzb"
         );
-        assert_eq!(safe_job_folder("..."), "Usenet download");
+        assert_eq!(safe_job_folder("..."), "Usenet-Download");
     }
 }

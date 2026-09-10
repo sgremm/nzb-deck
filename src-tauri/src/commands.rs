@@ -42,7 +42,7 @@ pub async fn import_paths(state: &AppState, paths: Vec<PathBuf>) -> Result<Vec<i
     let downloader_guard = state.downloader.read().await;
     let downloader = downloader_guard
         .as_ref()
-        .ok_or_else(|| "The download engine is not available".to_string())?;
+        .ok_or_else(|| "Die Download-Engine ist nicht verfügbar".to_string())?;
     let mut imported = Vec::with_capacity(paths.len());
 
     for path in paths {
@@ -51,12 +51,12 @@ pub async fn import_paths(state: &AppState, paths: Vec<PathBuf>) -> Result<Vec<i
         }
         let content = tokio::fs::read(&path)
             .await
-            .map_err(|error| format!("Could not read {}: {error}", path.display()))?;
+            .map_err(|error| format!("{} konnte nicht gelesen werden: {error}", path.display()))?;
         let name = path
             .file_stem()
             .and_then(|value| value.to_str())
             .filter(|value| !value.is_empty())
-            .unwrap_or("Usenet download");
+            .unwrap_or("Usenet-Download");
         let destination = state.next_job_destination(name).await?;
         let options = DownloadOptions {
             destination: Some(destination),
@@ -65,15 +65,15 @@ pub async fn import_paths(state: &AppState, paths: Vec<PathBuf>) -> Result<Vec<i
         let id = downloader
             .add_nzb_content(&content, name, options)
             .await
-            .map_err(|error| format!("Could not import {}: {error}", path.display()))?;
+            .map_err(|error| format!("Import von {} fehlgeschlagen: {error}", path.display()))?;
         tokio::fs::write(state.paths.nzb_dir.join(format!("{}.nzb", id.0)), content)
             .await
-            .map_err(|error| format!("Could not preserve NZB for rerun: {error}"))?;
+            .map_err(|error| format!("NZB für erneuten Download konnte nicht konserviert werden: {error}"))?;
         imported.push(id.0);
     }
 
     if imported.is_empty() {
-        return Err("No NZB files were selected".to_string());
+        return Err("Es wurden keine NZB-Dateien ausgewählt".to_string());
     }
     Ok(imported)
 }
@@ -83,7 +83,7 @@ pub async fn pause_job(state: State<'_, Arc<AppState>>, id: i64) -> Result<(), S
     let guard = state.downloader.read().await;
     let downloader = guard
         .as_ref()
-        .ok_or_else(|| "The download engine is not available".to_string())?;
+        .ok_or_else(|| "Die Download-Engine ist nicht verfügbar".to_string())?;
     downloader
         .pause(DownloadId(id))
         .await
@@ -95,18 +95,18 @@ pub async fn resume_job(state: State<'_, Arc<AppState>>, id: i64) -> Result<(), 
     let downloader_guard = state.downloader.read().await;
     let downloader = downloader_guard
         .as_ref()
-        .ok_or_else(|| "The download engine is not available".to_string())?;
+        .ok_or_else(|| "Die Download-Engine ist nicht verfügbar".to_string())?;
     let job = state
         .database
         .get_download(DownloadId(id))
         .await
         .map_err(|error| error.to_string())?
-        .ok_or_else(|| format!("Download {id} was not found"))?;
+        .ok_or_else(|| format!("Download {id} wurde nicht gefunden"))?;
     match Status::from_i32(job.status) {
         Status::Paused => downloader.resume(DownloadId(id)).await,
         Status::Failed => downloader.resume_download(DownloadId(id)).await,
         status => Err(usenet_dl::Error::Other(format!(
-            "Cannot resume a {status:?} download"
+            "Ein Download im Status {status:?} kann nicht fortgesetzt werden"
         ))),
     }
     .map_err(|error| error.to_string())
@@ -118,13 +118,13 @@ pub async fn rerun_job(state: State<'_, Arc<AppState>>, id: i64) -> Result<i64, 
     let source_path = state.paths.nzb_dir.join(format!("{id}.nzb"));
     let content = tokio::fs::read(&source_path)
         .await
-        .map_err(|_| "The preserved NZB is unavailable; this job cannot be rerun".to_string())?;
+        .map_err(|_| "Die konservierte NZB-Datei ist nicht verfügbar; dieser Auftrag kann nicht erneut gestartet werden".to_string())?;
     let original = state
         .database
         .get_download(DownloadId(id))
         .await
         .map_err(|error| error.to_string())?
-        .ok_or_else(|| format!("Download {id} was not found"))?;
+        .ok_or_else(|| format!("Download {id} wurde nicht gefunden"))?;
     let destination = state.next_job_destination(&original.name).await?;
     let options = DownloadOptions {
         destination: Some(destination),
@@ -133,7 +133,7 @@ pub async fn rerun_job(state: State<'_, Arc<AppState>>, id: i64) -> Result<i64, 
     let downloader_guard = state.downloader.read().await;
     let downloader = downloader_guard
         .as_ref()
-        .ok_or_else(|| "The download engine is not available".to_string())?;
+        .ok_or_else(|| "Die Download-Engine ist nicht verfügbar".to_string())?;
     let new_id = downloader
         .add_nzb_content(&content, &original.name, options)
         .await
@@ -143,7 +143,7 @@ pub async fn rerun_job(state: State<'_, Arc<AppState>>, id: i64) -> Result<i64, 
         content,
     )
     .await
-    .map_err(|error| format!("Could not preserve NZB for rerun: {error}"))?;
+    .map_err(|error| format!("NZB für erneuten Download konnte nicht konserviert werden: {error}"))?;
     Ok(new_id.0)
 }
 
@@ -152,7 +152,7 @@ pub async fn reprocess_job(state: State<'_, Arc<AppState>>, id: i64) -> Result<(
     let guard = state.downloader.read().await;
     let downloader = guard
         .as_ref()
-        .ok_or_else(|| "The download engine is not available".to_string())?;
+        .ok_or_else(|| "Die Download-Engine ist nicht verfügbar".to_string())?;
     downloader
         .reprocess(DownloadId(id))
         .await
@@ -167,7 +167,7 @@ pub async fn test_server(
     let downloader_guard = state.downloader.read().await;
     let downloader = downloader_guard
         .as_ref()
-        .ok_or_else(|| "The download engine is not available".to_string())?;
+        .ok_or_else(|| "Die Download-Engine ist nicht verfügbar".to_string())?;
     let result = downloader
         .test_server(&ServerConfig {
             host: settings.host.trim().to_string(),
@@ -185,11 +185,11 @@ pub async fn test_server(
             .latency
             .map(|value| format!(" in {} ms", value.as_millis()))
             .unwrap_or_default();
-        Ok(format!("Connection and authentication succeeded{latency}"))
+        Ok(format!("Verbindung und Anmeldung erfolgreich{latency}"))
     } else {
         Err(result
             .error
-            .unwrap_or_else(|| "Server test failed".to_string()))
+            .unwrap_or_else(|| "Servertest fehlgeschlagen".to_string()))
     }
 }
 

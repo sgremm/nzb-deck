@@ -101,7 +101,7 @@ pub fn run() {
 
     let app = builder
         .build(tauri::generate_context!())
-        .expect("failed to build NZB Deck");
+        .expect("NZB Deck konnte nicht initialisiert werden");
 
     app.run(|app_handle, event| match event {
         RunEvent::Opened { urls } => {

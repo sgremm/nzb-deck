@@ -12,7 +12,7 @@ fn parse_and_verify(path: &Path) -> Result<rust_par2::VerifyResult, String> {
     let file_set = rust_par2::parse(path).map_err(|error| error.to_string())?;
     let directory = path
         .parent()
-        .ok_or_else(|| "PAR2 file has no parent directory".to_string())?;
+        .ok_or_else(|| "Die PAR2-Datei hat kein übergeordnetes Verzeichnis".to_string())?;
     Ok(rust_par2::verify(&file_set, directory))
 }
 
@@ -22,8 +22,8 @@ impl ParityHandler for NativeParityHandler {
         let path = par2_file.to_path_buf();
         let result = tokio::task::spawn_blocking(move || parse_and_verify(&path))
             .await
-            .map_err(|error| Error::Other(format!("PAR2 verification task failed: {error}")))?
-            .map_err(|error| Error::Other(format!("PAR2 verification failed: {error}")))?;
+            .map_err(|error| Error::Other(format!("PAR2-Prüfauftrag fehlgeschlagen: {error}")))?
+            .map_err(|error| Error::Other(format!("PAR2-Prüfung fehlgeschlagen: {error}")))?;
 
         Ok(DownloadVerifyResult {
             is_complete: result.all_correct(),
@@ -47,10 +47,10 @@ impl ParityHandler for NativeParityHandler {
         let path = PathBuf::from(par2_file);
         tokio::task::spawn_blocking(move || {
             let file_set = rust_par2::parse(&path)
-                .map_err(|error| Error::Other(format!("PAR2 parse failed: {error}")))?;
+                .map_err(|error| Error::Other(format!("PAR2-Auswertung fehlgeschlagen: {error}")))?;
             let directory = path
                 .parent()
-                .ok_or_else(|| Error::Other("PAR2 file has no parent directory".to_string()))?;
+                .ok_or_else(|| Error::Other("Die PAR2-Datei hat kein übergeordnetes Verzeichnis".to_string()))?;
             let verification = rust_par2::verify(&file_set, directory);
             let repaired_files: Vec<String> = verification
                 .damaged
@@ -80,7 +80,7 @@ impl ParityHandler for NativeParityHandler {
             }
         })
         .await
-        .map_err(|error| Error::Other(format!("PAR2 repair task failed: {error}")))?
+        .map_err(|error| Error::Other(format!("PAR2-Reparaturauftrag fehlgeschlagen: {error}")))?
     }
 
     fn capabilities(&self) -> ParityCapabilities {

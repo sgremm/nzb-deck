@@ -69,7 +69,7 @@ pkill -f "NZB Deck.app"; open -a "src-tauri/target/debug/bundle/macos/NZB Deck.a
 
 ```
 nzb-deck/
-├── src/                        # Svelte-Frontend (eine Seite: Auftragskarten, Einstellungen)
+├── src/                        # Svelte-Frontend (routes/, lib/components/, lib/jobs.ts)
 ├── src-tauri/
 │   ├── src/
 │   │   ├── main.rs             # Tauri-Einstieg

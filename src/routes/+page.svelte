@@ -366,7 +366,7 @@
     void Promise.all([
       listen<DownloadEvent>("download-event", ({ payload }) => updateFromEvent(payload)),
       listen<number[]>("nzb-imported", () => scheduleReload(true)),
-      listen<string>("nzb-import-error", ({ payload }) => { globalError = `Import fehlgeschlagen: ${payload}`; })
+      listen<string>("nzb-import-error", ({ payload }) => { globalError = payload; })
     ]).then((listeners) => {
       if (disposed) listeners.forEach((unlisten) => unlisten());
       else unlisteners.push(...listeners);

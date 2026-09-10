@@ -132,15 +132,13 @@ pub fn run() {
 
 fn import_in_background(app: tauri::AppHandle, state: Arc<AppState>, paths: Vec<PathBuf>) {
     tauri::async_runtime::spawn(async move {
-        match commands::import_paths(&state, paths).await {
-            Ok(ids) => {
-                use tauri::Emitter;
-                let _ = app.emit("nzb-imported", ids);
-            }
-            Err(error) => {
-                use tauri::Emitter;
-                let _ = app.emit("nzb-import-error", error);
-            }
+        let outcome = commands::import_paths(&state, paths).await;
+        use tauri::Emitter;
+        if !outcome.errors.is_empty() {
+            let _ = app.emit("nzb-import-error", outcome.error_text());
+        }
+        if !outcome.imported.is_empty() {
+            let _ = app.emit("nzb-imported", outcome.imported);
         }
     });
 }

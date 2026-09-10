@@ -1,9 +1,9 @@
 use crate::models::{AppSettings, BackendStatus, JobView};
-use crate::state::AppState;
+use crate::state::{server_config, AppState};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::{AppHandle, State};
-use usenet_dl::{DownloadId, DownloadOptions, ServerConfig, Status};
+use usenet_dl::{DownloadId, DownloadOptions, Status};
 
 #[tauri::command]
 pub async fn get_settings(state: State<'_, Arc<AppState>>) -> Result<AppSettings, String> {
@@ -168,18 +168,7 @@ pub async fn test_server(
     let downloader = downloader_guard
         .as_ref()
         .ok_or_else(|| "Die Download-Engine ist nicht verfügbar".to_string())?;
-    let result = downloader
-        .test_server(&ServerConfig {
-            host: settings.host.trim().to_string(),
-            port: settings.port,
-            tls: settings.tls,
-            username: option(&settings.username),
-            password: option(&settings.password),
-            connections: settings.connections.clamp(1, 50),
-            priority: 0,
-            pipeline_depth: 10,
-        })
-        .await;
+    let result = downloader.test_server(&server_config(&settings)).await;
     if result.success {
         let latency = result
             .latency
@@ -193,7 +182,7 @@ pub async fn test_server(
     }
 }
 
-fn is_nzb(path: &Path) -> bool {
+pub(crate) fn is_nzb(path: &Path) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
         .is_some_and(|extension| extension.eq_ignore_ascii_case("nzb"))
@@ -253,9 +242,4 @@ pub async fn clear_jobs(state: State<'_, Arc<AppState>>) -> Result<usize, String
         removed += 1;
     }
     Ok(removed)
-}
-
-fn option(value: &str) -> Option<String> {
-    let value = value.trim();
-    (!value.is_empty()).then(|| value.to_string())
 }

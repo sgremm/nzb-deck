@@ -7,6 +7,27 @@ use tokio::sync::{Mutex, RwLock};
 use usenet_dl::config::{DuplicateAction, PostProcess};
 use usenet_dl::{Config, Database, ServerConfig, Status, UsenetDownloader};
 
+/// Maximale Anzahl NNTP-Verbindungen pro Server (UI- und Backend-Limit).
+pub(crate) const MAX_CONNECTIONS: usize = 50;
+/// Anzahl pipeline-Befehle pro Verbindung (ARTICLE-Command-Pipelining).
+pub(crate) const PIPELINE_DEPTH: usize = 10;
+
+/// Erstellt die usenet-dl-Serverkonfiguration aus den App-Einstellungen.
+/// Nutzen `make_config` und `test_server` gemeinsam, damit Limits nicht
+/// auseinanderlaufen.
+pub(crate) fn server_config(settings: &AppSettings) -> ServerConfig {
+    ServerConfig {
+        host: settings.host.trim().to_string(),
+        port: settings.port,
+        tls: settings.tls,
+        username: nonempty(&settings.username),
+        password: nonempty(&settings.password),
+        connections: settings.connections.clamp(1, MAX_CONNECTIONS),
+        priority: 0,
+        pipeline_depth: PIPELINE_DEPTH,
+    }
+}
+
 pub struct AppPaths {
     pub data_dir: PathBuf,
     pub settings_file: PathBuf,
@@ -131,16 +152,7 @@ impl AppState {
         config.tools.parity_handler = Some(Arc::new(NativeParityHandler));
         config.notifications.scripts.clear();
         config.servers = if include_server {
-            vec![ServerConfig {
-                host: settings.host.trim().to_string(),
-                port: settings.port,
-                tls: settings.tls,
-                username: nonempty(&settings.username),
-                password: nonempty(&settings.password),
-                connections: settings.connections.clamp(1, 50),
-                priority: 0,
-                pipeline_depth: 10,
-            }]
+            vec![server_config(settings)]
         } else {
             Vec::new()
         };
@@ -282,7 +294,7 @@ async fn load_settings(path: &Path, default_download_dir: &Path) -> AppSettings 
     }
 }
 
-fn nonempty(value: &str) -> Option<String> {
+pub(crate) fn nonempty(value: &str) -> Option<String> {
     let value = value.trim();
     (!value.is_empty()).then(|| value.to_string())
 }

@@ -4,8 +4,8 @@ mod parity;
 mod state;
 
 use commands::{
-    backend_status, clear_jobs, delete_job, get_settings, import_nzbs, list_jobs, pause_job,
-    reprocess_job, rerun_job, resume_job, save_settings, test_server,
+    backend_status, clear_jobs, delete_job, get_settings, import_nzbs, is_nzb, list_jobs,
+    pause_job, reprocess_job, rerun_job, resume_job, save_settings, test_server,
 };
 use state::AppState;
 use std::path::PathBuf;
@@ -158,12 +158,6 @@ fn paths_from_strings(values: impl IntoIterator<Item = String>) -> Vec<PathBuf> 
         })
         .filter(|path| is_nzb(path))
         .collect()
-}
-
-fn is_nzb(path: &std::path::Path) -> bool {
-    path.extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("nzb"))
 }
 
 #[cfg(test)]

@@ -46,11 +46,20 @@ Repo: `~/Projekte/nzb-deck`
 ```bash
 cd ~/Projekte/nzb-deck
 npm install                 # einmalig (unter src-tauri/ auch: cargo build)
+npm run dev                 # nur Frontend mit Vite (ohne Tauri-Fenster)
+npm run tauri dev           # App im Entwicklungsmodus
 npm run check               # Svelte-/TS-Prüfung (0 Fehler)
-cd src-tauri && cargo test  # Tests: 4 lib-Tests + 6 par2_cleanup-Pipeline-Tests
+cd src-tauri
+cargo test                  # Tests: 6 lib-Tests + 6 par2_cleanup-Pipeline-Tests
+cargo fmt --check -p nzb-deck   # Formatierung (nur eigenes Crate)
+cargo clippy --all-targets -p nzb-deck -- -D warnings  # Lints (Vendor ausgenommen)
 cd .. && npm run tauri build -- --debug --bundles app
 open "src-tauri/target/debug/bundle/macos/NZB Deck.app"
 ```
+
+GitHub Actions (`.github/workflows/ci.yml`) läuft auf macOS-Runnern und prüft
+bei Push/PR `npm run check` sowie `cargo fmt --check`, Clippy mit
+`-D warnings` und `cargo test`.
 
 Testläufe mit Logging direkt aus dem Terminal:
 
@@ -79,6 +88,7 @@ nzb-deck/
 │   │   ├── models.rs           # JobView/BackendStatus/AppSettings (serde)
 │   │   └── parity.rs           # PAR2-Handler-Anbindung (NativeParityHandler)
 │   ├── vendor/
+│   │   ├── PATCHES.md          # dokumentiert jede Vendor-Abweichung (Pflicht nach Update)
 │   │   ├── usenet-dl/          # gepatchte Kopie von usenet-dl 0.4.0
 │   │   ├── nntp-rs/            # gepatcht (Zeilenumbrüche im Article-Body)
 │   │   └── tao/                # gepatcht (unwrap-Panic beim Öffnen)
@@ -126,13 +136,14 @@ Einstellungen enthalten Zugangsdaten des Newsservers; die Datei ist über
 ## Vendoring & bekannte Patches
 
 Alle Patches liegen in `src-tauri/vendor/`; usenet-dl referenziert nntp-rs als
-Path-Dependency, tao ist via `[patch.crates-io]` umgelenkt.
+Path-Dependency, tao ist via `[patch.crates-io]` umgelenkt. Jede Abweichung
+(Patch-Stelle, Grund, Commit, Prüfweg gegen eine Frisch-Kopie) ist in
+[`src-tauri/vendor/PATCHES.md`](src-tauri/vendor/PATCHES.md) dokumentiert —
+nach jedem Vendor-Update dort ergänzen.
 
-| Crate | Patch | Grund |
-|---|---|---|
-| `usenet-dl` | Extraktion via `unrar`/`zip`, Magic-Header-Erkennung in `extraction/shared.rs` (`detect_archive_type`, `sanitize_relative_path`/`sanitize_path_component`), PAR2-Originalnamen vor Verify, Ordner je Job | Endungslose Archive entpacken; unanlegbare Zeichen (Unicode-Noncharacters/PUA) ersetzen; fehlende Unterordner anlegen |
-| `nntp-rs` | Zeilenumbrüche im Article-Body erhalten | Verbindungs-/Datenverlust am echten Provider |
-| `tao` | unwrap-Panic bei `Opened`-Event | Doppelklick-Crash auf macOS |
+Kurz: `usenet-dl` (Magic-Header-Erkennung, Pfad-Sanitizer, PAR2-Originalnamen
+vor Verify, Fehler statt stiller Datei-Müll), `nntp-rs` (Zeilenumbrüche im
+Article-Body erhalten), `tao` (unwrap-Panic beim `Opened`-Event behoben).
 
 Provider-Eigenheiten: Der Test-Provider liefert Posts teils nur mit Verzögerung
 oder mit `430 No Such Article` (DMCA-artiger Abbau); Artikelabrufe ohne `GROUP`

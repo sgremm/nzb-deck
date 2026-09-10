@@ -67,8 +67,8 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .map_err(|error| Box::<dyn std::error::Error>::from(error.to_string()))?;
-            let state = tauri::async_runtime::block_on(AppState::new(&app.handle(), data_dir))
-                .map_err(|error| Box::<dyn std::error::Error>::from(error))?;
+            let state = tauri::async_runtime::block_on(AppState::new(app.handle(), data_dir))
+                .map_err(Box::<dyn std::error::Error>::from)?;
             app.manage(state.clone());
 
             // Fruehe "Oeffnen mit"-Ereignisse (vor manage) jetzt importieren.

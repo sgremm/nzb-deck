@@ -27,8 +27,11 @@ async fn unique_root(label: &str) -> PathBuf {
 fn write_zip_archive(path: &Path, entry_name: &str, content: &[u8]) {
     let file = std::fs::File::create(path).expect("create archive");
     let mut archive = zip::ZipWriter::new(file);
-    let options = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
-    archive.start_file(entry_name, options).expect("start entry");
+    let options =
+        zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    archive
+        .start_file(entry_name, options)
+        .expect("start entry");
     archive.write_all(content).expect("write entry");
     archive.finish().expect("finish archive");
 }
@@ -137,8 +140,7 @@ async fn unpacked_archive_removes_par2_but_keeps_extracted_content() {
 async fn direct_download_removes_par2_and_keeps_content() {
     let root = unique_root("par2-direkt").await;
     let destination = run_pipeline(&root, "Direktes E-Book", |download_path| {
-        std::fs::write(download_path.join("buch.azw3"), b"ebook-inhalt")
-            .expect("write content");
+        std::fs::write(download_path.join("buch.azw3"), b"ebook-inhalt").expect("write content");
         std::fs::write(download_path.join("buch.par2"), b"par2 index").expect("write par2");
         std::fs::write(download_path.join("buch.vol00+01.par2"), b"par2 volume")
             .expect("write par2 volume");

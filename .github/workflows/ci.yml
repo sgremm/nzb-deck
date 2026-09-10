@@ -1,0 +1,49 @@
+# NZB Deck CI: Frontend-Check und Rust-Build/-Tests.
+# Laeuft auf macOS-Runnern, weil Tauri (Cocoa/WebKit) und das gepatchte
+# vendor/tao unter Linux nicht baubar sind.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  frontend:
+    name: Frontend (svelte-check)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+
+  backend:
+    name: Backend (fmt, clippy, test)
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+      - name: Format-Pruefung (nur eigenes Crate)
+        run: cargo fmt --check -p nzb-deck
+      - name: Clippy (nur eigenes Crate, Vendor-Warnungen ausgenommen)
+        run: cargo clippy --all-targets -p nzb-deck -- -D warnings
+      - name: Tests
+        run: cargo test

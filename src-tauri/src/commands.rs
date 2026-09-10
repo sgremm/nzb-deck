@@ -1,5 +1,5 @@
 use crate::models::{AppSettings, BackendStatus, JobView};
-use crate::state::{server_config, AppState};
+use crate::state::{AppState, server_config};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
@@ -133,7 +133,9 @@ async fn import_single(
         .map_err(|error| format!("Import von {} fehlgeschlagen: {error}", path.display()))?;
     tokio::fs::write(nzb_dir.join(format!("{}.nzb", id.0)), content)
         .await
-        .map_err(|error| format!("NZB für erneuten Download konnte nicht konserviert werden: {error}"))?;
+        .map_err(|error| {
+            format!("NZB für erneuten Download konnte nicht konserviert werden: {error}")
+        })?;
     Ok(id.0)
 }
 
@@ -202,7 +204,9 @@ pub async fn rerun_job(state: State<'_, Arc<AppState>>, id: i64) -> Result<i64, 
         content,
     )
     .await
-    .map_err(|error| format!("NZB für erneuten Download konnte nicht konserviert werden: {error}"))?;
+    .map_err(|error| {
+        format!("NZB für erneuten Download konnte nicht konserviert werden: {error}")
+    })?;
     Ok(new_id.0)
 }
 
@@ -295,7 +299,11 @@ pub async fn clear_jobs(state: State<'_, Arc<AppState>>) -> Result<usize, String
             continue;
         }
         // Einzelfehler nicht abbrechen lassen: Rest aufarbeiten, am Ende melden.
-        match state.database.delete_download(DownloadId(download.id)).await {
+        match state
+            .database
+            .delete_download(DownloadId(download.id))
+            .await
+        {
             Ok(()) => {
                 remove_job_artifacts(&state, download.id).await;
                 removed += 1;

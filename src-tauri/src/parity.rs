@@ -46,11 +46,12 @@ impl ParityHandler for NativeParityHandler {
     async fn repair(&self, par2_file: &Path) -> usenet_dl::Result<DownloadRepairResult> {
         let path = PathBuf::from(par2_file);
         tokio::task::spawn_blocking(move || {
-            let file_set = rust_par2::parse(&path)
-                .map_err(|error| Error::Other(format!("PAR2-Auswertung fehlgeschlagen: {error}")))?;
-            let directory = path
-                .parent()
-                .ok_or_else(|| Error::Other("Die PAR2-Datei hat kein übergeordnetes Verzeichnis".to_string()))?;
+            let file_set = rust_par2::parse(&path).map_err(|error| {
+                Error::Other(format!("PAR2-Auswertung fehlgeschlagen: {error}"))
+            })?;
+            let directory = path.parent().ok_or_else(|| {
+                Error::Other("Die PAR2-Datei hat kein übergeordnetes Verzeichnis".to_string())
+            })?;
             let verification = rust_par2::verify(&file_set, directory);
             let repaired_files: Vec<String> = verification
                 .damaged

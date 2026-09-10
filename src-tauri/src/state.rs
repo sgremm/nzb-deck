@@ -249,7 +249,7 @@ impl AppState {
             .await
             .map_err(|error| error.to_string())?;
         for download in downloads {
-            if PathBuf::from(&download.destination) != root {
+            if Path::new(&download.destination) != root.as_path() {
                 continue;
             }
             let destination = self.next_job_destination(&download.name).await?;

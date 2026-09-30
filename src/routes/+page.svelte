@@ -266,7 +266,7 @@
 </div>
 
 {#if sheetOpen}
-  <SettingsSheet onclose={() => { sheetOpen = false; }} onbackend={loadBackend} />
+  <SettingsSheet onclose={() => { sheetOpen = false; }} onbackend={loadBackend} version={backend.version} />
 {/if}
 
 <style>

@@ -8,9 +8,10 @@
   interface Props {
     onclose: () => void;
     onbackend: () => void;
+    version: string;
   }
 
-  let { onclose, onbackend }: Props = $props();
+  let { onclose, onbackend, version }: Props = $props();
 
   let settings = $state<AppSettings>({ ...defaultSettings });
   let sheet: HTMLElement | undefined = $state();
@@ -123,6 +124,7 @@
           <button class="button primary" type="submit" disabled={loading || saving || testing}>{saving ? "Wird gespeichert …" : "Speichern"}</button>
         </div>
       </footer>
+      <p class="app-version">NZB Deck Version {version || "unbekannt"}</p>
     </form>
   </div>
 </div>
@@ -156,6 +158,7 @@
   .form-message.success { color: var(--success); background: var(--success-soft); }
   .sheet-actions { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-5); }
   .sheet-actions div { display: flex; gap: var(--space-2); }
+  .app-version { margin: var(--space-5) 0 0; color: var(--text-muted); font-size: 0.72rem; text-align: center; font-variant-numeric: tabular-nums; }
 
   @media (max-width: 42rem) {
     .settings-sheet { max-height: calc(100vh - var(--space-4)); }

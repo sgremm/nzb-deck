@@ -1,6 +1,6 @@
 [package]
 name = "nzb-deck"
-version = "0.1.0"
+version = "0.1.1"
 description = "Native Usenet downloader for macOS and iOS"
 authors = ["SGremm"]
 edition = "2024"

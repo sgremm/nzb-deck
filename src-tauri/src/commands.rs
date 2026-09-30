@@ -212,6 +212,18 @@ pub async fn rerun_job(state: State<'_, Arc<AppState>>, id: i64) -> Result<i64, 
 
 #[tauri::command]
 pub async fn reprocess_job(state: State<'_, Arc<AppState>>, id: i64) -> Result<(), String> {
+    // Nach Abschluss liegen die Dateien im Zielordner, nicht mehr im
+    // Temp-Ordner; ein erneuter Lauf würde den fertigen Auftrag als
+    // fehlgeschlagen markieren.
+    let job = state
+        .database
+        .get_download(DownloadId(id))
+        .await
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("Download {id} wurde nicht gefunden"))?;
+    if !matches!(Status::from_i32(job.status), Status::Failed) {
+        return Err("Nur fehlgeschlagene Downloads können erneut verarbeitet werden".into());
+    }
     let guard = state.downloader.read().await;
     let downloader = guard
         .as_ref()
@@ -261,6 +273,7 @@ fn is_removable(status: Status) -> bool {
 async fn remove_job_artifacts(state: &AppState, id: i64) {
     let _ = tokio::fs::remove_file(state.paths.nzb_dir.join(format!("{id}.nzb"))).await;
     let _ = tokio::fs::remove_dir_all(state.paths.temp_dir.join(format!("download_{id}"))).await;
+    state.failures.forget(id).await;
 }
 
 #[tauri::command]

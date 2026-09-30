@@ -1,3 +1,4 @@
+use crate::failures::FailureLog;
 use crate::models::{AppSettings, BackendStatus, JobView};
 use crate::parity::NativeParityHandler;
 use std::path::{Path, PathBuf};
@@ -32,6 +33,7 @@ pub struct AppPaths {
     pub data_dir: PathBuf,
     pub settings_file: PathBuf,
     pub database_file: PathBuf,
+    pub failures_file: PathBuf,
     pub nzb_dir: PathBuf,
     pub temp_dir: PathBuf,
 }
@@ -42,6 +44,7 @@ pub struct AppState {
     pub downloader: RwLock<Option<UsenetDownloader>>,
     pub import_lock: Mutex<()>,
     pub database: Arc<Database>,
+    pub failures: Arc<FailureLog>,
     pub connection_error: RwLock<Option<String>>,
 }
 
@@ -50,6 +53,7 @@ impl AppState {
         let paths = AppPaths {
             settings_file: data_dir.join("settings.json"),
             database_file: data_dir.join("downloads.sqlite3"),
+            failures_file: data_dir.join("failure_stages.json"),
             nzb_dir: data_dir.join("nzbs"),
             temp_dir: data_dir.join("temporary"),
             data_dir,
@@ -71,6 +75,7 @@ impl AppState {
                 .await
                 .map_err(|error| error.to_string())?,
         );
+        let failures = Arc::new(FailureLog::load(paths.failures_file.clone()).await);
 
         let state = Arc::new(Self {
             paths,
@@ -78,6 +83,7 @@ impl AppState {
             downloader: RwLock::new(None),
             import_lock: Mutex::new(()),
             database,
+            failures,
             connection_error: RwLock::new(None),
         });
         state.migrate_legacy_destinations().await?;
@@ -123,10 +129,12 @@ impl AppState {
     ) {
         let mut events = downloader.subscribe();
         let event_app = app.clone();
+        let failures = self.failures.clone();
         tauri::async_runtime::spawn(async move {
             loop {
                 match events.recv().await {
                     Ok(event) => {
+                        failures.observe(&event).await;
                         let _ = event_app.emit("download-event", event);
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
@@ -193,11 +201,18 @@ impl AppState {
             .into_iter()
             .map(|job| {
                 let status = Status::from_i32(job.status);
+                let stage = match status {
+                    Status::Failed => self
+                        .failures
+                        .stage(job.id)
+                        .unwrap_or_else(|| stage_name(status).to_string()),
+                    _ => stage_name(status).to_string(),
+                };
                 JobView {
                     id: job.id,
                     name: job.name,
                     status: status_name(status).to_string(),
-                    stage: stage_name(status).to_string(),
+                    stage,
                     progress: job.progress.clamp(0.0, 100.0),
                     speed_bps: job.speed_bps.max(0) as u64,
                     size_bytes: job.size_bytes.max(0) as u64,

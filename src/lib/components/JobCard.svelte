@@ -66,7 +66,6 @@
         <button class="button quiet danger" type="button" disabled={busy} onclick={ondelete}>Löschen</button>
       {:else if job.status === "complete"}
         <button class="button primary" type="button" disabled={busy} onclick={onrerun}>↻&nbsp; Neu herunterladen</button>
-        <button class="button secondary" type="button" disabled={busy} onclick={onreprocess}>Erneut verarbeiten</button>
         <button class="button quiet danger" type="button" disabled={busy} onclick={ondelete}>Löschen</button>
       {/if}
     </div>

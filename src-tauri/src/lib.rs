@@ -1,4 +1,5 @@
 mod commands;
+mod failures;
 mod models;
 mod parity;
 mod state;

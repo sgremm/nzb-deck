@@ -83,7 +83,9 @@
       case "cleaning": update = { status: "processing", stage: "extract", progress: 100, destination: event.destination ?? job.destination }; break;
       case "complete": update = { status: "complete", stage: "complete", progress: 100, speedBps: 0, destination: event.path ?? job.destination, error: null }; break;
       case "download_failed": update = { status: "failed", stage: "download", speedBps: 0, error: event.error ?? "Download fehlgeschlagen" }; break;
-      case "failed": update = { status: "failed", stage: event.stage ?? job.stage, speedBps: 0, error: event.error ?? "Verarbeitung fehlgeschlagen" }; break;
+      // event.stage ist bei usenet-dl pauschal "extract"; die zuletzt gezeigte Stufe ist genauer,
+      // der anschließende Reload liefert die vom Backend protokollierte Stufe.
+      case "failed": update = { status: "failed", stage: job.stage, speedBps: 0, error: event.error ?? "Verarbeitung fehlgeschlagen" }; break;
       default: scheduleReload(); return;
     }
     jobs = jobs.map((candidate, candidateIndex) => candidateIndex === index ? { ...candidate, ...update } : candidate);

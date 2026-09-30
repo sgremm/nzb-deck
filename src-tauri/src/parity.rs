@@ -66,11 +66,17 @@ impl ParityHandler for NativeParityHandler {
                 .collect();
 
             match rust_par2::repair_from_verify(&file_set, directory, &verification) {
-                Ok(result) => Ok(DownloadRepairResult {
-                    success: result.success,
+                Ok(result) if result.success => Ok(DownloadRepairResult {
+                    success: true,
                     repaired_files,
                     failed_files: Vec::new(),
-                    error: (!result.success).then_some(result.message),
+                    error: None,
+                }),
+                Ok(result) => Ok(DownloadRepairResult {
+                    success: false,
+                    repaired_files: Vec::new(),
+                    failed_files: repaired_files,
+                    error: Some(result.message),
                 }),
                 Err(error) => Ok(DownloadRepairResult {
                     success: false,

@@ -1,0 +1,31 @@
+# NZB Deck CI auf dem Mac-Runner (Label macos, Host-Executor).
+# Tauri und das gepatchte vendor/tao sind unter Linux nicht baubar.
+# Wenn .forgejo/workflows existiert, ignoriert Forgejo .github/workflows.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  frontend:
+    name: Frontend (svelte-check)
+    runs-on: macos
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v4
+      - run: npm ci
+      - run: npm run check
+
+  backend:
+    name: Backend (fmt, clippy, test)
+    runs-on: macos
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v4
+      - run: cargo fmt --check -p nzb-deck
+      - run: cargo clippy --all-targets -p nzb-deck -- -D warnings
+      - run: cargo test

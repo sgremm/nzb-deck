@@ -29,3 +29,20 @@ jobs:
       - run: cargo fmt --check -p nzb-deck
       - run: cargo clippy --all-targets -p nzb-deck -- -D warnings
       - run: cargo test
+
+  deploy:
+    name: Deploy (App bauen und nach /Applications installieren)
+    runs-on: macos
+    needs: [frontend, backend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v4
+      - run: npm ci
+      - run: npx tauri build --bundles app
+      - name: Installieren
+        run: |
+          app="src-tauri/target/release/bundle/macos/NZB Deck.app"
+          osascript -e 'tell application "NZB Deck" to quit' || true
+          sleep 2
+          rm -rf "/Applications/NZB Deck.app"
+          cp -R "$app" /Applications/

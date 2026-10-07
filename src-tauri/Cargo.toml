@@ -42,3 +42,8 @@ lto = true
 opt-level = 3
 panic = "abort"
 strip = true
+
+# strip = true strippt auch Proc-Macro-Dylibs, rustc findet sie dann nicht
+# mehr (E0463 "can't find crate for ..._macros").
+[profile.release.build-override]
+strip = "none"

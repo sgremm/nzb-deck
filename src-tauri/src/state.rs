@@ -286,7 +286,10 @@ impl AppState {
             configured: settings.is_configured(),
             connected: settings.is_configured() && error.is_none(),
             error,
-            version: env!("CARGO_PKG_VERSION").to_string(),
+            version: match env!("GIT_HASH") {
+                "" => env!("CARGO_PKG_VERSION").to_string(),
+                hash => format!("{} ({hash})", env!("CARGO_PKG_VERSION")),
+            },
         }
     }
 }
